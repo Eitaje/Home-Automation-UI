@@ -35,10 +35,14 @@ The dashboard connects to a backend API (running on TrueNAS) and displays live d
 
 ```
 home-automation-ui/
-├── index.html          # Full UI markup — header, tabs, cards, gauge containers
-├── vite.config.js      # Dev server config with API proxy
-├── .env.example        # Environment variable template
-├── .env                # Local config (git-ignored)
+├── index.html                    # Full UI markup — header, tabs, cards, gauge containers
+├── vite.config.js                # Dev server config with API proxy
+├── .env.example                  # Environment variable template
+├── .env                          # Local config (git-ignored)
+├── Dockerfile                    # Multi-stage build: Node builder + nginx serving
+├── docker-entrypoint.sh          # Runtime entrypoint — injects API_URL into nginx config
+├── nginx.template.conf           # nginx config template with __API_URL__ placeholder
+├── docker-compose.ui.truenas.yml # TrueNAS deployment compose file
 └── src/
     ├── main.js         # App entry — polling loops, event handling, orchestration
     ├── api.js          # API layer — REST calls and WebSocket connection
@@ -103,6 +107,40 @@ npm run preview   # locally preview the production build
 
 ---
 
+## Docker Deployment
+
+The UI ships as a Docker image (`eitaje/homeauto-ui:latest`) built with a two-stage Dockerfile:
+
+1. **Builder stage** — Node 20 runs `npm ci && npm run build`, producing static files in `dist/`.
+2. **Serve stage** — nginx 1.27 (Alpine) serves the static files and proxies `/devices` and `/ws` to the backend at runtime.
+
+The backend URL is injected at container start via the `API_URL` environment variable. `docker-entrypoint.sh` substitutes the `__API_URL__` placeholder in `nginx.template.conf` and writes the final nginx config before starting the server.
+
+### Build & Push
+
+```bash
+cd "home automation UI"
+docker build -t eitaje/homeauto-ui:latest .
+docker push eitaje/homeauto-ui:latest
+```
+
+### TrueNAS Deployment
+
+Copy `docker-compose.ui.truenas.yml` to TrueNAS, then:
+
+```bash
+sudo docker compose -f docker-compose.ui.truenas.yml pull
+sudo docker compose -f docker-compose.ui.truenas.yml up -d
+```
+
+The UI is served on port `8080`. `SERVER_IP` defaults to `192.168.1.70`; override it with an environment variable if needed:
+
+```bash
+SERVER_IP=192.168.1.100 sudo docker compose -f docker-compose.ui.truenas.yml up -d
+```
+
+---
+
 ## Features
 
 ### Live Tab
@@ -131,7 +169,7 @@ The default view. Updates in real time via WebSocket, with polling fallback.
 
 Time-series charts for every metric. Loaded lazily when the tab is first opened.
 
-- **Time window selector** — 50 / 100 / 200 (default) / 500 / 2000 data points
+- **Time window selector** — 50 / 100 / 200 (default) / 500 / 1000 / 2000 data points
 - **Moving average toggle** — overlays an 8-point moving average on each chart
 - **Manual refresh** button
 - Temperature chart shows ENS160 and BMP580 as two overlaid lines
@@ -182,7 +220,7 @@ Expected message format:
 
 - **No framework.** Vanilla JS keeps the bundle minimal. All state lives in module-level variables; the DOM is the source of truth for display.
 - **Four focused modules.** `api.js` owns all network I/O. `gauges.js` and `charts.js` own their respective rendering. `main.js` wires everything together.
-- **Vite proxy strategy.** All fetch/WebSocket calls use relative paths (e.g. `/devices/…`). The proxy in `vite.config.js` rewrites them to the backend in dev; in production the app is typically served from the same origin as the API.
+- **Vite proxy strategy.** All fetch/WebSocket calls use relative paths (e.g. `/devices/…`). In dev, `vite.config.js` proxies them to the backend. In production (Docker), nginx handles the proxying based on the `API_URL` injected at container start.
 - **Polling + WebSocket hybrid.** WebSocket gives low-latency updates; periodic polling ensures the UI recovers after a dropped connection without manual intervention.
 - **SVG gauges, Canvas charts.** Custom SVG for gauges (crisp at any DPI, animatable with CSS); Chart.js Canvas for time-series (well-suited to dense datasets).
 - **Lazy chart init.** `charts.js` builds Chart instances only when the History tab is first activated, avoiding unnecessary work on initial load.

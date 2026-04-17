@@ -8,9 +8,10 @@ RUN npm run build
 
 # ── Stage 2: serve ────────────────────────────────────────────────────────────
 FROM nginx:1.27-alpine
-# Remove default config
 RUN rm /etc/nginx/conf.d/default.conf
-# Template is processed at container start by the official nginx image
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY nginx.template.conf /etc/nginx/nginx.template.conf
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
+ENTRYPOINT ["/docker-entrypoint.sh"]
