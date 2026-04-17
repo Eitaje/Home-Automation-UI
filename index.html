@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EITAJE | Home Automation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">EITAJE</div>
+      <div class="logo-sub">Home Automation System</div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="serverState">connecting</span>
+      </div>
+      <div class="header-clock" id="headerClock"></div>
+    </div>
+  </header>
+
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="live">Live</button>
+    <button class="tab-btn" data-tab="history">History</button>
+  </nav>
+
+  <main class="dashboard">
+
+    <!-- ── TAB: Live ── -->
+    <div id="tab-live">
+
+      <div class="section-label">Boiler Control</div>
+      <div class="card boiler-card" id="boilerCard">
+        <div class="boiler-left">
+          <div class="boiler-label">Heating System</div>
+          <div class="boiler-state" id="boilerState">—</div>
+        </div>
+        <div class="boiler-right">
+          <label class="toggle">
+            <input type="checkbox" id="boilerToggle">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section-label">Temperature</div>
+      <div class="gauge-grid">
+        <div class="card gauge-card" id="card-water_temperature">
+          <div class="card-head"><span class="card-name">Water-Tank Temp</span><span class="card-unit">°C</span></div>
+          <div id="gauge-water_temperature"></div>
+        </div>
+        <div class="card gauge-card" id="card-temperature">
+          <div class="card-head"><span class="card-name">Outside Temp (ENS160)</span><span class="card-unit">°C</span></div>
+          <div id="gauge-temperature"></div>
+        </div>
+        <div class="card gauge-card" id="card-temperature_bmp580">
+          <div class="card-head"><span class="card-name">Outside Temp (BMP580)</span><span class="card-unit">°C</span></div>
+          <div id="gauge-temperature_bmp580"></div>
+        </div>
+      </div>
+
+      <div class="section-label">Climate</div>
+      <div class="gauge-grid">
+        <div class="card gauge-card" id="card-humidity">
+          <div class="card-head"><span class="card-name">Humidity</span><span class="card-unit">%</span></div>
+          <div id="gauge-humidity"></div>
+        </div>
+        <div class="card gauge-card" id="card-light">
+          <div class="card-head"><span class="card-name">Light Intensity</span><span class="card-unit">lux</span></div>
+          <div id="gauge-light"></div>
+        </div>
+        <div class="card gauge-card" id="card-pressure">
+          <div class="card-head"><span class="card-name">Pressure</span><span class="card-unit">hPa</span></div>
+          <div id="gauge-pressure"></div>
+        </div>
+      </div>
+
+      <div class="section-label">Air Quality — ENS160</div>
+      <div class="gauge-grid">
+        <div class="card gauge-card" id="card-CO2">
+          <div class="card-head"><span class="card-name">CO₂</span><span class="card-unit">ppm</span></div>
+          <div id="gauge-CO2"></div>
+        </div>
+        <div class="card gauge-card" id="card-VOC">
+          <div class="card-head"><span class="card-name">VOC</span><span class="card-unit">ppb</span></div>
+          <div id="gauge-VOC"></div>
+        </div>
+        <div class="card gauge-card" id="card-AQI">
+          <div class="card-head"><span class="card-name">Air Quality Index</span><span class="card-unit">1–5</span></div>
+          <div id="gauge-AQI"></div>
+        </div>
+      </div>
+
+    </div><!-- /tab-live -->
+
+    <!-- ── TAB: History ── -->
+    <div id="tab-history" class="tab-hidden">
+
+      <div class="history-toolbar">
+        <span class="section-label" style="margin:0" id="historyTitle">History</span>
+        <div class="toolbar-controls">
+          <div class="count-bar">
+            <button class="count-btn" data-count="50">50</button>
+            <button class="count-btn" data-count="100">100</button>
+            <button class="count-btn active" data-count="200">200</button>
+            <button class="count-btn" data-count="500">500</button>
+            <button class="count-btn" data-count="2000">2000</button>
+          </div>
+          <button class="ctrl-btn active" id="maToggleBtn">◎ MA</button>
+          <button class="ctrl-btn" id="refreshBtn">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Water-Tank Temperature</span><span class="card-unit">°C</span></div>
+          <div class="chart-wrap"><canvas id="chart-water-temperature"></canvas></div>
+          <!-- chart id uses hyphen intentionally — charts.js references it directly -->
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Outside Temperature</span><span class="card-unit">°C</span></div>
+          <div class="chart-wrap"><canvas id="chart-temperature"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Humidity</span><span class="card-unit">%</span></div>
+          <div class="chart-wrap"><canvas id="chart-humidity"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Light Intensity</span><span class="card-unit">lux</span></div>
+          <div class="chart-wrap"><canvas id="chart-light"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">CO₂</span><span class="card-unit">ppm</span></div>
+          <div class="chart-wrap"><canvas id="chart-CO2"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">VOC</span><span class="card-unit">ppb</span></div>
+          <div class="chart-wrap"><canvas id="chart-VOC"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Air Quality Index</span><span class="card-unit">1–5</span></div>
+          <div class="chart-wrap"><canvas id="chart-AQI"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Pressure</span><span class="card-unit">hPa</span></div>
+          <div class="chart-wrap"><canvas id="chart-pressure"></canvas></div>
+        </div>
+      </div>
+
+    </div><!-- /tab-history -->
+
+  </main>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
