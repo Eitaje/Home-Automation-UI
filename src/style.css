@@ -199,13 +199,13 @@ input:checked + .toggle-track:before { transform: translateX(28px); background: 
   background: var(--bg); border: 1px solid var(--border);
   border-radius: 10px; padding: 3px;
 }
-.count-btn {
+.count-btn, .res-btn {
   font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500;
   color: var(--text-muted); background: transparent; border: none;
   border-radius: 7px; padding: 4px 12px; cursor: pointer; transition: all 0.2s;
 }
-.count-btn:hover { color: var(--accent); background: var(--accent-dim); }
-.count-btn.active {
+.count-btn:hover, .res-btn:hover { color: var(--accent); background: var(--accent-dim); }
+.count-btn.active, .res-btn.active {
   color: var(--accent); background: var(--bg-card);
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }

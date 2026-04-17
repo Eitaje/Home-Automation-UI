@@ -18,7 +18,6 @@ const COLOR = {
 const AQI_COLORS = ['', '#10b981', '#84cc16', '#f59e0b', '#ef4444', '#7c3aed'];
 
 let charts = {};
-let showMA  = true;
 const MA_WIN = 8;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,18 +48,8 @@ function lineDS(label, data, color) {
   };
 }
 
-function maDS(label, data, color) {
-  return {
-    label, data: ma(data),
-    borderColor: hex2rgba(color, 0.55),
-    backgroundColor: 'transparent',
-    borderWidth: 1.5, borderDash: [5, 4],
-    pointRadius: 0, tension: 0.35, fill: false,
-    hidden: !showMA,
-  };
-}
 
-function baseOpts(extraY = {}) {
+function baseOpts(extraY = {}, extraScales = {}) {
   return {
     responsive: true, maintainAspectRatio: false, animation: false,
     interaction: { mode: 'index', intersect: false },
@@ -71,6 +60,7 @@ function baseOpts(extraY = {}) {
         borderColor: 'rgba(0,0,0,0.1)', borderWidth: 1,
         titleColor: '#94a3b8', bodyColor: '#e2e8f0',
         titleFont: FONT, bodyFont: { ...FONT, size: 12 }, padding: 10,
+        filter: item => item.dataset.label !== 'No data',
       },
     },
     scales: {
@@ -83,23 +73,57 @@ function baseOpts(extraY = {}) {
         grid: { color: GRID }, border: { color: 'rgba(0,0,0,0.08)' },
         ...extraY,
       },
+      ...extraScales,
     },
   };
 }
 
-function build(id, labels, datasets, extraY = {}) {
+function build(id, labels, datasets, extraY = {}, extraScales = {}) {
   const canvas = document.getElementById(id);
   if (!canvas) return;
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
   charts[id] = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: { labels, datasets },
-    options: baseOpts(extraY),
+    options: baseOpts(extraY, extraScales),
   });
 }
 
+// ── Missing-data indicator bar (uses a hidden secondary y-axis) ───────────────
+function missingBarDS(missingFlags) {
+  return {
+    type: 'bar',
+    label: 'No data',
+    data: missingFlags.map(m => m ? 6 : null),
+    yAxisID: 'y_ind',
+    backgroundColor: 'rgba(239,68,68,0.45)',
+    borderColor: 'transparent',
+    borderWidth: 0,
+    barPercentage: 1.0,
+    categoryPercentage: 1.0,
+    order: 999,
+  };
+}
+
+const INDICATOR_AXIS = {
+  y_ind: {
+    display: false,
+    min: 0, max: 100,
+    position: 'right',
+    grid: { drawOnChartArea: false },
+  },
+};
+
+function labelForMs(ms, resolution) {
+  const d = new Date(ms);
+  if (resolution === '1d' || resolution === '1w') {
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+  return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
-export function renderCharts(entries) {
+export function renderCharts(entries, resolution = 'raw') {
   if (!entries?.length) {
     console.warn('[charts] no entries received');
     return;
@@ -112,7 +136,9 @@ export function renderCharts(entries) {
     return ta - tb;
   });
 
+  const isAgg = resolution !== 'raw';
   const labels = [];
+  const missing = [];
   const s = {
     water_temperature: [], temperature: [], temperature_bmp580: [],
     humidity: [], light: [], CO2: [], VOC: [], AQI: [], pressure: [],
@@ -120,31 +146,29 @@ export function renderCharts(entries) {
 
   for (const entry of entries) {
     const ms = parseInt(String(entry.id).split('-')[0]);
-    if (ms > 0) {
-      const d = new Date(ms);
-      labels.push(
-        d.getHours().toString().padStart(2, '0') + ':' +
-        d.getMinutes().toString().padStart(2, '0')
-      );
-    } else {
-      labels.push('');
-    }
+    labels.push(ms > 0 ? labelForMs(ms, resolution) : '');
+    missing.push(isAgg && entry.missing === '1');
     for (const key of Object.keys(s)) {
       const v = entry[key];
       s[key].push(v != null && v !== '' ? parseFloat(v) : null);
     }
   }
 
+  // For raw data: apply moving average. For aggregated: use values as-is.
+  const series = (data) => isAgg ? data : ma(data);
+  const extraScales = isAgg ? INDICATOR_AXIS : {};
+  const missingDs = () => isAgg ? [missingBarDS(missing)] : [];
+
   // Water-tank temperature
   build('chart-water-temperature', labels,
-    [lineDS('Water Tank', s.water_temperature, COLOR.water_temperature),
-     maDS('MA', s.water_temperature, COLOR.water_temperature)]);
+    [lineDS('Water Tank', series(s.water_temperature), COLOR.water_temperature), ...missingDs()],
+    {}, extraScales);
 
   // Outside temp: ENS160 + BMP580, dual-line with legend
   const tempCanvas = document.getElementById('chart-temperature');
   if (tempCanvas) {
     if (charts['chart-temperature']) { charts['chart-temperature'].destroy(); delete charts['chart-temperature']; }
-    const opts = baseOpts();
+    const opts = baseOpts({}, extraScales);
     opts.plugins.legend = {
       display: true,
       labels: { color: TICK, font: FONT, boxWidth: 10, padding: 12 },
@@ -154,10 +178,9 @@ export function renderCharts(entries) {
       data: {
         labels,
         datasets: [
-          lineDS('ENS160', s.temperature, COLOR.temperature),
-          maDS('ENS160 MA', s.temperature, COLOR.temperature),
-          lineDS('BMP580', s.temperature_bmp580, COLOR.temperature_bmp580),
-          maDS('BMP580 MA', s.temperature_bmp580, COLOR.temperature_bmp580),
+          lineDS('ENS160', series(s.temperature), COLOR.temperature),
+          lineDS('BMP580', series(s.temperature_bmp580), COLOR.temperature_bmp580),
+          ...missingDs(),
         ],
       },
       options: opts,
@@ -165,20 +188,30 @@ export function renderCharts(entries) {
   }
 
   build('chart-humidity', labels,
-    [lineDS('Humidity', s.humidity, COLOR.humidity), maDS('MA', s.humidity, COLOR.humidity)]);
+    [lineDS('Humidity', series(s.humidity), COLOR.humidity), ...missingDs()],
+    {}, extraScales);
 
   build('chart-light', labels,
-    [lineDS('Lux', s.light, COLOR.light), maDS('MA', s.light, COLOR.light)]);
+    [lineDS('Lux', series(s.light), COLOR.light), ...missingDs()],
+    {}, extraScales);
 
   build('chart-CO2', labels,
-    [lineDS('CO₂', s.CO2, COLOR.CO2), maDS('MA', s.CO2, COLOR.CO2)]);
+    [lineDS('CO₂', series(s.CO2), COLOR.CO2), ...missingDs()],
+    {}, extraScales);
 
   build('chart-VOC', labels,
-    [lineDS('VOC', s.VOC, COLOR.VOC), maDS('MA', s.VOC, COLOR.VOC)]);
+    [lineDS('VOC', series(s.VOC), COLOR.VOC), ...missingDs()],
+    {}, extraScales);
 
+  const pressureVals = s.pressure.filter(v => v != null);
+  const pMax = pressureVals.length ? Math.max(...pressureVals) : 1030;
+  const pMean = pressureVals.length ? pressureVals.reduce((a, b) => a + b, 0) / pressureVals.length : 1030;
+  const pStd = pressureVals.length > 1
+    ? Math.sqrt(pressureVals.reduce((acc, v) => acc + (v - pMean) ** 2, 0) / pressureVals.length)
+    : 0;
   build('chart-pressure', labels,
-    [lineDS('Pressure', s.pressure, COLOR.pressure), maDS('MA', s.pressure, COLOR.pressure)],
-    { suggestedMin: 990, suggestedMax: 1030 });
+    [lineDS('Pressure', series(s.pressure), COLOR.pressure), ...missingDs()],
+    { suggestedMin: 990, max: Math.ceil(pMax + pStd) }, extraScales);
 
   // AQI — colour-coded bar chart
   const aqiCanvas = document.getElementById('chart-AQI');
@@ -219,12 +252,6 @@ export function renderCharts(entries) {
 }
 
 export function toggleMA() {
-  showMA = !showMA;
-  for (const chart of Object.values(charts)) {
-    chart.data.datasets.forEach(ds => {
-      if (Array.isArray(ds.borderDash)) ds.hidden = !showMA;
-    });
-    chart.update('none');
-  }
-  return showMA;
+  // MA is now the only plot — toggle is a no-op
+  return true;
 }

@@ -105,14 +105,14 @@
       <div class="history-toolbar">
         <span class="section-label" style="margin:0" id="historyTitle">History</span>
         <div class="toolbar-controls">
-          <div class="count-bar">
-            <button class="count-btn" data-count="50">50</button>
-            <button class="count-btn" data-count="100">100</button>
-            <button class="count-btn active" data-count="200">200</button>
-            <button class="count-btn" data-count="500">500</button>
-            <button class="count-btn" data-count="2000">2000</button>
+          <div class="count-bar" id="resBtns">
+            <button class="res-btn active" data-res="raw">Raw</button>
+            <button class="res-btn" data-res="15min">15 min</button>
+            <button class="res-btn" data-res="1h">Hourly</button>
+            <button class="res-btn" data-res="1d">Daily</button>
+            <button class="res-btn" data-res="1w">Weekly</button>
           </div>
-          <button class="ctrl-btn active" id="maToggleBtn">◎ MA</button>
+          <div class="count-bar" id="spanBtns"></div>
           <button class="ctrl-btn" id="refreshBtn">↻ Refresh</button>
         </div>
       </div>

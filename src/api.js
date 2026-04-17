@@ -12,7 +12,8 @@ export const fetchLatest      = () => get('/devices/nodemcu/latest');
 export const fetchSensorStatus= () => get('/devices/nodemcu/sensor_status');
 export const fetchBoiler      = () => get('/devices/nodemcu/boiler');
 export const fetchDevices     = () => get('/devices');
-export const fetchHistory     = (count = 200) => get(`/devices/nodemcu/history?count=${count}`);
+export const fetchHistory        = (count = 200) => get(`/devices/nodemcu/history?count=${count}`);
+export const fetchAggregations   = (resolution, count) => get(`/devices/nodemcu/aggregations?resolution=${resolution}&count=${count}`);
 
 export async function setBoiler(state) {
   const r = await fetch(`${BASE}/devices/nodemcu/boiler`, {
